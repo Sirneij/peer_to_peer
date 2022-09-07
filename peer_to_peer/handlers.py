@@ -73,19 +73,18 @@ def add_money(environ, user: User) -> dict[str, Any]:
 
     context = {'status': '200 Ok'}
 
-    user_data = user.user_data
-    for data in user_data:
-        if request_meta_query.get('name').replace('\'', '').lower() in data.values():
-            if data.get('password') == request_meta_query.get('password'):
-                data['balance'] = data.get('balance', 0.0) + float(request_meta_query.get('amount'))
-                context['data'] = data
-            else:
-                return {
-                    'error': 'You are not authorized to add money to this user\'s balance.',
-                    'status': '401 Unauthorized',
-                }
+    user_data = user.return_user(request_meta_query.get('name').replace('\'', '').lower())
+    if user_data:
+        if user_data['password'] == request_meta_query.get('password'):
+            user_data['balance'] = user_data.get('balance', 0.0) + float(request_meta_query.get('amount'))
+            context['data'] = user_data
         else:
-            return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
+            return {
+                'error': 'You are not authorized to add money to this user\'s balance.',
+                'status': '401 Unauthorized',
+            }
+    else:
+        return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
 
     return context
 
@@ -100,18 +99,24 @@ def check_balance(environ, user: User) -> dict[str, Any]:
 
     context = {'status': '200 Ok'}
 
-    user_data = user.user_data
-    for data in user_data:
-        if request_meta_query.get('name').replace('\'', '').lower() in data.values():
-            if data.get('password') == request_meta_query.get('password'):
-                context['data'] = {'balance': data.get('balance', 0.0)}
+    user_data = user.return_user(request_meta_query.get('name').replace('\'', '').lower())
+    if user_data:
+        password = request_meta_query.get('password')
+        if password:
+            if user_data['password'] == password:
+                context['data'] = {'balance': user_data.get('balance', 0.0)}
             else:
                 return {
                     'error': 'You are not authorized to check this user\'s balance.',
                     'status': '401 Unauthorized',
                 }
         else:
-            return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
+            return {
+                'error': 'You must provide the user\'s password to check balance.',
+                'status': '401 Unauthorized',
+            }
+    else:
+        return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
     return context
 
 
@@ -125,36 +130,37 @@ def transfer_money_to_user(environ, user: User) -> dict[str, Any]:
 
     context = {'status': '200 Ok'}
 
-    user_data = user.user_data
+    user_data = user.return_user(request_meta_query.get('from_name').replace('\'', '').lower())
 
-    for data in user_data:
-        if request_meta_query.get('from_name').replace('\'', '').lower() in data.values():
-            if data.get('password') == request_meta_query.get('from_password'):
-                if request_meta_query.get('amount') and data.get('balance') >= float(request_meta_query.get('amount')):
-                    beneficiary = user.return_user(request_meta_query.get('to_name').replace('\'', '').lower())
-                    if beneficiary:
-                        beneficiary['balance'] = beneficiary.get('balance', 0.0) + float(request_meta_query['amount'])
-                        data['balance'] = data['balance'] - float(request_meta_query['amount'])
-                        context[
-                            'data'
-                        ] = f'A sum of ${float(request_meta_query["amount"])} was successfully transferred to {request_meta_query.get("to_name")}.'
-                    else:
-                        return {
-                            'error': 'The user you want to credit does not exist.',
-                            'status': '404 Not Found',
-                        }
+    if user_data:
+        if user_data['password'] == request_meta_query.get('from_password'):
+            if request_meta_query.get('amount') and user_data.get('balance', 0.0) >= float(
+                request_meta_query.get('amount')
+            ):
+                beneficiary = user.return_user(request_meta_query.get('to_name').replace('\'', '').lower())
+                if beneficiary:
+                    beneficiary['balance'] = beneficiary.get('balance', 0.0) + float(request_meta_query['amount'])
+                    user_data['balance'] = user_data['balance'] - float(request_meta_query['amount'])
+                    context[
+                        'data'
+                    ] = f'A sum of ${float(request_meta_query["amount"])} was successfully transferred to {request_meta_query.get("to_name")}.'
                 else:
                     return {
-                        'error': 'You either have insufficient funds or did not include `amount` as query parameter.',
+                        'error': 'The user you want to credit does not exist.',
                         'status': '404 Not Found',
                     }
             else:
                 return {
-                    'error': 'You are not authorized to access this user\'s account.',
-                    'status': '401 Unauthorized',
+                    'error': 'You either have insufficient funds or did not include `amount` as query parameter.',
+                    'status': '404 Not Found',
                 }
         else:
-            return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
+            return {
+                'error': 'You are not authorized to access this user\'s account.',
+                'status': '401 Unauthorized',
+            }
+    else:
+        return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
     return context
 
 
@@ -168,25 +174,24 @@ def transfer_money_out(environ, user: User) -> dict[str, Any]:
 
     context = {'status': '200 Ok'}
 
-    user_data = user.user_data
-    for data in user_data:
-        if request_meta_query.get('name').replace('\'', '').lower() in data.values():
-            if data.get('password') == request_meta_query.get('password'):
-                if request_meta_query.get('amount') and data.get('balance') >= float(request_meta_query.get('amount')):
-                    data['balance'] = data['balance'] - float(request_meta_query['amount'])
-                    context[
-                        'data'
-                    ] = f'A sum of ${float(request_meta_query["amount"])} was successfully transferred to {request_meta_query.get("to_bank")}.'
-                else:
-                    return {
-                        'error': 'You either have insufficient funds or did not include `amount` as query parameter.',
-                        'status': '404 Not Found',
-                    }
+    user_data = user.return_user(request_meta_query.get('name').replace('\'', '').lower())
+    if user_data:
+        if user_data.get('password') == request_meta_query.get('password'):
+            if request_meta_query.get('amount') and user_data.get('balance') >= float(request_meta_query.get('amount')):
+                user_data['balance'] = user_data['balance'] - float(request_meta_query['amount'])
+                context[
+                    'data'
+                ] = f'A sum of ${float(request_meta_query["amount"])} was successfully transferred to {request_meta_query.get("to_bank")}.'
             else:
                 return {
-                    'error': 'You are not authorized to access this user\'s account.',
-                    'status': '401 Unauthorized',
+                    'error': 'You either have insufficient funds or did not include `amount` as query parameter.',
+                    'status': '404 Not Found',
                 }
         else:
-            return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
+            return {
+                'error': 'You are not authorized to access this user\'s account.',
+                'status': '401 Unauthorized',
+            }
+    else:
+        return {'error': 'A user with that name does not exist.', 'status': '404 Not Found'}
     return context

@@ -13,6 +13,7 @@ class User:
 
     def return_user(self, username) -> dict[str, Any] | None:
         for d in self._user_data:
-            if d.get(username) in d.values():
+            if username in d.values():
+                print("here!")
                 return d
         return None
