@@ -126,3 +126,7 @@ There are currently the following `endpoints`, in addition to the domain `http:/
   "A sum of $10 was successfully transferred to GTB"
   ```
   Approriate errors are raised in case of incorrect parameters or ommission.
+
+## Automatic test
+
+Automatic unittests are currently being written.
