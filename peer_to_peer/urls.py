@@ -43,7 +43,7 @@ def url_handlers(environ, start_reponse, user: User):
         data = json.dumps(context.get('data')) if context.get('data') else json.dumps(context.get('error'))
         status = context['status']
     else:
-        data, status = json.dumps({'error': '404 Not Found'}), '400 Not FOund'
+        data, status = json.dumps({'error': '404 Not Found'}), '400 Not Found'
 
     data = data.encode('utf-8')
     content_type = 'application/json' if int(status.split(' ')[0]) < 400 else 'text/plain'
